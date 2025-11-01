@@ -1,152 +1,172 @@
 #!/bin/bash
 
-# Ollama Docker Setup Script
-# This script installs Docker, Docker Compose, and sets up Ollama with a web UI
-# Created on: October 31, 2025
+# Open WebUI Installation Script
+# Modified by Claude, based on kylanj7's Docker-Ollama-WebUI-Install
+# This script automates the installation of Docker, Ollama, and Open WebUI
 
-set -e  # Exit on error
-
-# Color codes for better readability
-RED='\033[0;31m'
+# Text colors
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
-YELLOW='\033[0;33m'
+YELLOW='\033[1;33m'
+RED='\033[0;31m'
 NC='\033[0m' # No Color
 
-echo -e "${BLUE}=========================================${NC}"
-echo -e "${BLUE}  Ollama Docker Setup Script            ${NC}"
-echo -e "${BLUE}=========================================${NC}"
+echo -e "${BLUE}=====================================================================${NC}"
+echo -e "${BLUE}                Open WebUI with Ollama Setup Script                  ${NC}"
+echo -e "${BLUE}=====================================================================${NC}"
 
-# Check if script is run as root
-if [ "$EUID" -ne 0 ]; then
-  echo -e "${RED}Please run as root or with sudo${NC}"
-  exit 1
+# Check for root/sudo privileges
+if [[ $EUID -ne 0 ]]; then
+   echo -e "${RED}This script must be run with sudo or as root.${NC}"
+   exit 1
 fi
 
-# Function to print section headers
-section() {
-  echo -e "\n${GREEN}>>> $1${NC}"
+# Function to check if a command exists
+command_exists() {
+  command -v "$1" >/dev/null 2>&1
 }
 
-# Step 1: Update system
-section "Updating system packages"
-apt-get update
-apt-get upgrade -y
+# Install Docker if it's not already installed
+install_docker() {
+    echo -e "${YELLOW}Installing Docker...${NC}"
+    
+    # Update package lists
+    apt-get update
+    
+    # Install packages to allow apt to use a repository over HTTPS
+    apt-get install -y \
+        apt-transport-https \
+        ca-certificates \
+        curl \
+        gnupg \
+        lsb-release
+    
+    # Add Docker's official GPG key
+    mkdir -p /etc/apt/keyrings
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+    
+    # Set up the Docker repository
+    echo \
+      "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
+      $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+    
+    # Update package lists again
+    apt-get update
+    
+    # Install Docker Engine, containerd, and Docker Compose
+    apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+    
+    # Enable and start Docker service
+    systemctl enable docker
+    systemctl start docker
+    
+    echo -e "${GREEN}Docker installed successfully.${NC}"
+}
 
-# Step 2: Install Docker dependencies
-section "Installing Docker dependencies"
-apt-get install -y apt-transport-https ca-certificates curl gnupg lsb-release
+# Install Ollama if it's not already installed
+install_ollama() {
+    echo -e "${YELLOW}Installing Ollama...${NC}"
+    
+    # Download and run the Ollama install script
+    curl -fsSL https://ollama.com/install.sh | sh
+    
+    echo -e "${GREEN}Ollama installed successfully.${NC}"
+}
 
-# Step 3: Add Docker's official GPG key
-section "Adding Docker's GPG key"
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+# Configure Ollama service to listen on all interfaces and set models path
+configure_ollama() {
+    echo -e "${YELLOW}Configuring Ollama service...${NC}"
+    
+    # Create systemd override directory if it doesn't exist
+    mkdir -p /etc/systemd/system/ollama.service.d
+    
+    # Create override.conf file
+    cat > /etc/systemd/system/ollama.service.d/override.conf << EOF
+[Service]
+Environment="OLLAMA_HOST=0.0.0.0"
+Environment="OLLAMA_MODELS=/usr/share/ollama/.ollama/models"
+EOF
+    
+    # Reload systemd daemon and restart Ollama service
+    systemctl daemon-reload
+    systemctl enable ollama
+    systemctl restart ollama
+    
+    echo -e "${GREEN}Ollama configured to listen on all interfaces.${NC}"
+}
 
-# Step 4: Set up the stable Docker repository
-section "Setting up Docker repository"
-echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
-
-# Step 5: Install Docker Engine
-section "Installing Docker Engine"
-apt-get update
-apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
-
-# Step 6: Verify Docker installation
-section "Verifying Docker installation"
-docker --version
-docker compose version
-
-# Step 7: Add current user to docker group to avoid using sudo
-section "Adding current user to docker group"
-usermod -aG docker $SUDO_USER
-
-# Step 8: Create directory for Ollama data
-section "Creating directory for Ollama data"
-OLLAMA_DIR="/home/$SUDO_USER/ollama"
-mkdir -p $OLLAMA_DIR/ollama-data
-chown -R $SUDO_USER:$SUDO_USER $OLLAMA_DIR
-
-# Step 9: Create Docker Compose file
-section "Creating Docker Compose configuration"
-cat > $OLLAMA_DIR/docker-compose.yml << 'EOL'
+# Set up Open WebUI with Docker
+setup_open_webui() {
+    echo -e "${YELLOW}Setting up Open WebUI with Docker...${NC}"
+    
+    # Create directory for Open WebUI
+    mkdir -p ~/open-webui/data
+    
+    # Create docker-compose.yml file
+    cat > ~/open-webui/docker-compose.yml << EOF
 version: '3'
-
 services:
-  ollama:
-    container_name: ollama
-    image: ollama/ollama:latest
+  open-webui:
+    container_name: open-webui
+    image: ghcr.io/open-webui/open-webui:main
     volumes:
-      - ./ollama-data:/root/.ollama
+      - ./data:/app/backend/data
     ports:
-      - "11434:11434"
+      - "3001:8080"
     restart: unless-stopped
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
-
-  webui:
-    container_name: ollama-webui
-    image: ghcr.io/ollama-webui/ollama-webui:main
-    volumes:
-      - ./webui-data:/app/backend/data
-    ports:
-      - "3000:8080"
-    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
-      - 'OLLAMA_API_BASE_URL=http://ollama:11434/api'
-    depends_on:
-      - ollama
-EOL
+      - OLLAMA_API_BASE_URL=http://host.docker.internal:11434/api
+      - OPENAI_API_KEY=open-webui-not-needed
+EOF
+    
+    # Start Open WebUI container
+    cd ~/open-webui
+    docker compose down -v 2>/dev/null || true  # Clean up any previous installation
+    docker compose up -d
+    
+    echo -e "${GREEN}Open WebUI setup completed.${NC}"
+}
 
-# Check if NVIDIA GPU is available and modify Docker Compose file accordingly
-if ! command -v nvidia-smi &> /dev/null; then
-  echo -e "${YELLOW}NVIDIA GPU not detected. Removing GPU configuration from docker-compose.yml${NC}"
-  sed -i '/deploy:/,+5d' $OLLAMA_DIR/docker-compose.yml
-else
-  echo -e "${GREEN}NVIDIA GPU detected. Keeping GPU configuration.${NC}"
-  
-  # Step 9.5: Install NVIDIA Container Toolkit if GPU is available
-  section "Installing NVIDIA Container Toolkit"
-  curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
-  curl -s -L https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list | \
-    sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | \
-    tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
-  apt-get update
-  apt-get install -y nvidia-container-toolkit
-  nvidia-ctk runtime configure --runtime=docker
-  systemctl restart docker
-fi
+# Main installation flow
+main() {
+    echo -e "${YELLOW}Starting installation...${NC}"
+    
+    # Install Docker if not installed
+    if ! command_exists docker; then
+        install_docker
+    else
+        echo -e "${GREEN}Docker is already installed.${NC}"
+    fi
+    
+    # Install Ollama if not installed
+    if ! command_exists ollama; then
+        install_ollama
+    else
+        echo -e "${GREEN}Ollama is already installed.${NC}"
+    fi
+    
+    # Configure Ollama
+    configure_ollama
+    
+    # Set up Open WebUI
+    setup_open_webui
+    
+    # Final information
+    echo -e "${GREEN}=====================================================================${NC}"
+    echo -e "${GREEN}                  Setup completed successfully!                      ${NC}"
+    echo -e "${GREEN}=====================================================================${NC}"
+    echo -e "${YELLOW}Open WebUI is now available at: ${BLUE}http://localhost:3001${NC}"
+    echo -e "${YELLOW}If you don't see your models in Open WebUI, try these steps:${NC}"
+    echo -e "  ${BLUE}1. Check if Ollama is running: ${NC}systemctl status ollama"
+    echo -e "  ${BLUE}2. List your Ollama models: ${NC}ollama list"
+    echo -e "  ${BLUE}3. Restart Open WebUI: ${NC}cd ~/open-webui && docker compose restart"
+    echo -e "  ${BLUE}4. Check Open WebUI logs: ${NC}docker logs open-webui"
+    echo -e "${YELLOW}To stop Open WebUI: ${NC}cd ~/open-webui && docker compose down"
+    echo -e "${YELLOW}To start Open WebUI: ${NC}cd ~/open-webui && docker compose up -d"
+    echo -e "${GREEN}=====================================================================${NC}"
+}
 
-# Step 10: Create webui-data directory
-section "Creating webui-data directory"
-mkdir -p $OLLAMA_DIR/webui-data
-chown -R $SUDO_USER:$SUDO_USER $OLLAMA_DIR/webui-data
-
-# Step 11: Set permissions for Docker Compose file
-section "Setting permissions"
-chown $SUDO_USER:$SUDO_USER $OLLAMA_DIR/docker-compose.yml
-
-# Step 12: Instructions for starting the services
-section "Setup Complete!"
-echo -e "${GREEN}Docker, Ollama, and Web UI have been configured successfully!${NC}"
-echo -e "${YELLOW}IMPORTANT: You need to log out and log back in for the docker group changes to take effect.${NC}"
-echo ""
-echo -e "To start Ollama and the Web UI, run the following commands:"
-echo -e "${BLUE}cd ~/ollama${NC}"
-echo -e "${BLUE}docker compose up -d${NC}"
-echo ""
-echo -e "The services will be available at:"
-echo -e "- Ollama API: http://localhost:11434"
-echo -e "- Ollama Web UI: http://localhost:3000"
-echo ""
-echo -e "To pull a model, use:"
-echo -e "${BLUE}docker exec -it ollama ollama pull llama2${NC}"
-echo ""
-echo -e "To stop the services:"
-echo -e "${BLUE}cd ~/ollama${NC}"
-echo -e "${BLUE}docker compose down${NC}"
-echo ""
-echo -e "${GREEN}Happy coding!${NC}"
+# Run the main installation
+main
