@@ -23,7 +23,7 @@ This script automates the installation and configuration of:
 
 1. Clone this repository:
    ```bash
-   git clone https://github.com/yourusername/open-webui-install.git
+   git clone (https://github.com/kylanj7/OpenWebUI-Ollama-Backend/)
    cd open-webui-install
    ```
 
