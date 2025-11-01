@@ -1,111 +1,102 @@
-# Ollama with Docker and Web UI Setup Guide
+# Open WebUI with Ollama Installation Script
 
-This guide helps you set up Ollama with Docker and a user-friendly web interface on your Linux workstation.
+This repository contains an automated installation script for setting up [Open WebUI](https://github.com/open-webui/open-webui) (formerly Ollama Web UI) with [Ollama](https://ollama.com/) on Linux systems.
 
-## What's Included
+## What This Script Does
 
-This setup provides:
-- **Docker** - Container platform to run Ollama
-- **Ollama** - Local large language model runner
-- **Ollama Web UI** - User-friendly interface for interacting with your models
+This script automates the installation and configuration of:
 
-## System Requirements
+1. **Docker and Docker Compose** - For running Open WebUI in a container
+2. **Ollama** - The backend service that runs large language models locally
+3. **Open WebUI** - The web interface for interacting with Ollama models
+4. **System Service Configuration** - Sets up Ollama to properly expose its API and find models
 
-- Linux workstation (Ubuntu/Debian-based distro recommended)
-- At least 8GB RAM (16GB+ recommended for larger models)
-- 20GB+ free disk space
-- NVIDIA GPU (optional but recommended for better performance)
+## Requirements
 
-## Installation Instructions
+- A Linux system (Ubuntu/Debian-based systems recommended)
+- Sudo/root access
+- Internet connection
+- At least 32GB RAM and modern CPU recommended for running larger models (Nvidia GPU perferred)
+- Sufficient disk space for Docker images and LLM models
 
-1. Download the setup script:
-   ```
-   ollama_docker_setup.sh
+## Installation
+
+1. Clone this repository:
+   ```bash
+   git clone https://github.com/yourusername/open-webui-install.git
+   cd open-webui-install
    ```
 
 2. Make the script executable:
    ```bash
-   chmod +x ollama_docker_setup.sh
+   chmod +x install.sh
    ```
 
 3. Run the script with sudo:
    ```bash
-   sudo ./ollama_docker_setup.sh
+   sudo ./install.sh
    ```
 
-4. **Important**: Log out and log back in to apply the docker group membership.
+4. After installation completes, access Open WebUI at http://localhost:3001
 
-5. Start the services:
-   ```bash
-   cd ~/ollama
-   docker compose up -d
-   ```
+## Features
 
-## Accessing the Services
+- **Automated Installation** - Installs all necessary components with minimal user interaction
+- **Proper API Configuration** - Correctly configures Ollama to listen on all interfaces
+- **Model Path Configuration** - Sets up Ollama to find models in the standard location
+- **Docker Compose Setup** - Uses Docker Compose for easier management of the Open WebUI container
+- **System Service Integration** - Configures Ollama as a system service that starts on boot
 
-- **Ollama API**: http://localhost:11434
-- **Ollama Web UI**: http://localhost:3000
+## Post-Installation
+
+After installation:
+
+1. Open your browser and navigate to http://localhost:3001
+2. Create an account or log in
+3. Select one of your installed Ollama models from the dropdown
+4. Start chatting with your local LLM!
 
 ## Managing Models
 
-To pull a model (example: llama2):
-```bash
-docker exec -it ollama ollama pull llama2
-```
+To manage your models:
 
-Other available models include:
-- llama3 - Meta's LLaMA 3
-- mistral - Mistral AI's model
-- gemma - Google's lightweight model
-- phi3 - Microsoft's model
-- vicuna - Berkeley's model
-- ...and many more
+- **List models**: `ollama list`
+- **Pull new models**: `ollama pull modelname`
+- **Remove models**: `ollama rm modelname`
 
-## Stopping and Starting
+Any changes to your Ollama models will be reflected in Open WebUI.
 
-To stop the services:
-```bash
-cd ~/ollama
-docker compose down
-```
+## Maintenance Commands
 
-To start again:
-```bash
-cd ~/ollama
-docker compose up -d
-```
+- **Start Open WebUI**: `cd ~/open-webui && docker compose up -d`
+- **Stop Open WebUI**: `cd ~/open-webui && docker compose down`
+- **Update Open WebUI**: `cd ~/open-webui && docker compose pull && docker compose up -d`
+- **View logs**: `docker logs open-webui`
+- **Restart Ollama**: `sudo systemctl restart ollama`
 
 ## Troubleshooting
 
-- If you see "permission denied" errors with Docker, make sure you've logged out and logged back in after installation.
-- For GPU issues, check your NVIDIA drivers are properly installed with `nvidia-smi`.
-- To check logs: `docker logs ollama` or `docker logs ollama-webui`.
+If you don't see your models in Open WebUI:
 
-## Advanced Configuration
+1. Check if Ollama is running: `systemctl status ollama`
+2. Verify your models are installed: `ollama list`
+3. Check Open WebUI logs: `docker logs open-webui`
+4. Ensure Ollama is listening on all interfaces: `sudo netstat -tulpn | grep 11434`
+5. Restart both services:
+   ```bash
+   sudo systemctl restart ollama
+   cd ~/open-webui && docker compose restart
+   ```
 
-The Docker Compose file is located at `~/ollama/docker-compose.yml` and can be modified for:
-- Adding more memory/CPU limits
-- Changing ports
-- Adding custom volumes
-- Modifying environment variables
+## Contributing
 
-After changes, restart with:
-```bash
-cd ~/ollama
-docker compose down
-docker compose up -d
-```
+Contributions are welcome! Please feel free to submit a Pull Request.
 
-## Updating
+## License
 
-To update to the latest versions:
-```bash
-cd ~/ollama
-docker compose pull
-docker compose down
-docker compose up -d
-```
+This project is licensed under the MIT License - see the LICENSE file for details.
 
-## Security Note
+## Acknowledgments
 
-This setup is configured for local use. If you plan to expose this to a network, add proper authentication and encryption.
+- Based on the work by [kylanj7](https://github.com/kylanj7/Docker-Ollama-WebUI-Install)
+- Thanks to the [Open WebUI](https://github.com/open-webui/open-webui) and [Ollama](https://github.com/ollama/ollama) projects
